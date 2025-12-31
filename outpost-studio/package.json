@@ -1,0 +1,15 @@
+{
+  "name": "outpost-studio",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "sanity dev",
+    "start": "sanity start",
+    "build": "sanity build",
+    "deploy": "sanity deploy"
+  },
+  "dependencies": {
+    "@sanity/vision": "^5.1.0",
+    "sanity": "^5.1.0"
+  }
+}
