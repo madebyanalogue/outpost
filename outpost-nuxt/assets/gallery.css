@@ -237,17 +237,17 @@ body :is(p, h1, h2, h3, h4, h5, h6, input[type="text"], textarea) {
 /* Cursor "pointer" (Hover) */
 body :is([data-cursor="pointer"], [data-cursor="pointer"] *),
 body :is(a, a *, a p, button, button *, select, input[type="submit"], input[type="button"], input[type="radio"], input[type="checkbox"]) {
-  cursor: url("https://cdn.prod.website-files.com/684fd3662bf373c304f927ef/684fd3fa2e5a792140becaff_2b1e000c885a11daa778a26530dd8999_cursor-pointer.svg") 12 0, pointer;
+  cursor: url("/cursors/cursor-pointer.svg") 12 0, pointer;
 }
 
 /* Cursor "grab" */
 body :is([data-cursor="grab"], [data-cursor="grab"] *) {
-  cursor: url("https://cdn.prod.website-files.com/684fd3662bf373c304f927ef/684fd3fadd3e56db88677898_e4c3ca1346ce8749e9ebc404b2c38a67_cursor-grab.svg") 12 4, grab;
+  cursor: url("/cursors/cursor-grab.svg") 12 4, grab;
 }
 
 /* Cursor "grabbing" */
 body :is([data-cursor="grabbing"], [data-cursor="grabbing"] *) {
-  cursor: url("https://cdn.prod.website-files.com/684fd3662bf373c304f927ef/684fd3faadaedb1825819d22_93f8d20982e98baea5d26f613bf60af6_cursor-grabbing.svg") 12 0, grabbing;
+  cursor: url("/cursors/cursor-grabbing.svg") 12 0, grabbing;
 }
 
 footer {
@@ -257,12 +257,45 @@ footer {
     width: 8vw;
     height: 8vw;
     border-radius: 50%;
-    background:#444;
-    font-size: 1vw;
-    background:var(--body-background);
-    border:1px solid var(--border-color);
+    font-size: 0.57vw;
+    font-weight: 600;
+    /* background:var(--body-background);
+    border:1px solid var(--border-color); */
     color:var(--body-color);
+    text-transform: uppercase;
 }
 footer svg {
     fill:var(--body-color);
+    transform: scale(1.1);
 }
+footer .footer-cursor {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 50%;
+    object-fit: contain;
+    height: 50%;
+}
+.footer-background {
+    width:100%;
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    border:1.4vw solid var(--body-background);
+    background:var(--body-background);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--border-color);
+}
+/* .footer-background:after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background:var(--body-background);
+    border:1px solid var(--border-color);
+    border-radius: 50%;
+} */

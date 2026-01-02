@@ -167,7 +167,7 @@ function setupGallery() {
     pinHeight.style.height = `${calculatedHeight}vh`;
 
     const dist = (container as HTMLElement).clientWidth - document.body.clientWidth;
-    const footer = document.querySelector('footer') as HTMLElement;
+    const footerSvg = document.querySelector('footer svg') as HTMLElement;
 
     // Animate container horizontal movement
     gsap.to(container, {
@@ -196,9 +196,9 @@ function setupGallery() {
       }
     });
 
-    // Animate footer rotation based on scroll progress
-    if (footer) {
-      gsap.to(footer, {
+    // Animate footer SVG rotation based on scroll progress
+    if (footerSvg) {
+      gsap.to(footerSvg, {
         rotation: 360,
         ease: 'none',
         scrollTrigger: {
