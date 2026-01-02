@@ -1,3 +1,4 @@
+
 /* Font Face */
 @font-face {
     font-family: 'PPFragmentGlareLight';
@@ -31,6 +32,7 @@
 html {
     /* Enable smooth scrolling for Lenis */
     scroll-behavior: auto; /* Lenis will handle smoothness */
+    background: var(--body-background);
 }
 
 body {
@@ -38,6 +40,7 @@ body {
     color: var(--body-color);
     font-family: var(--body-font);
     font-size: 2vw;
+    opacity: 0;
 }
 .pin-height {
     height: calc(300vh - 4vw);
@@ -254,8 +257,8 @@ footer {
     position: fixed;
     top:1.3vw;
     right:1.3vw;
-    width: 8vw;
-    height: 8vw;
+    width: clamp(120px, 10vw, 230px);
+    height: clamp(120px, 10vw, 230px);
     border-radius: 50%;
     font-size: 0.57vw;
     font-weight: 600;
@@ -263,19 +266,24 @@ footer {
     border:1px solid var(--border-color); */
     color:var(--body-color);
     text-transform: uppercase;
+    /* opacity and visibility controlled by critical CSS at top of file */
 }
 footer svg {
-    fill:var(--body-color);
+    fill:#999;
     transform: scale(1.1);
+    opacity: 1 !important;
+}
+footer .footer-cursor {
+    opacity: 1 !important;
 }
 footer .footer-cursor {
     position: absolute;
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-    width: 50%;
+    width: 110%;
     object-fit: contain;
-    height: 50%;
+    height: 110%;
 }
 .footer-background {
     width:100%;
@@ -286,7 +294,7 @@ footer .footer-cursor {
     border:1.4vw solid var(--body-background);
     background:var(--body-background);
     border-radius: 50%;
-    box-shadow: 0 0 0 1px var(--border-color);
+    border:1px solid var(--border-color);
 }
 /* .footer-background:after {
     content: '';

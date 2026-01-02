@@ -10,6 +10,24 @@ let lenis: Lenis | null = null;
 
 export default defineNuxtPlugin(async (nuxtApp) => {
   if (process.client) {
+    // Fade in body once page is loaded
+    const fadeInBody = () => {
+      if (document.body) {
+        gsap.to(document.body, {
+          opacity: 1,
+          duration: 0.6,
+          ease: 'power2.out'
+        });
+      }
+    };
+    
+    // Wait for page to be fully loaded
+    if (document.readyState === 'complete') {
+      fadeInBody();
+    } else {
+      window.addEventListener('load', fadeInBody, { once: true });
+    }
+    
     // Wait for Vue app to be mounted
     nuxtApp.hook('app:mounted', async () => {
       await init();
