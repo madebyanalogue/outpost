@@ -1,0 +1,268 @@
+/* Font Face */
+@font-face {
+    font-family: 'PPFragmentGlareLight';
+    src: url('./fonts/PPFragmentGlareLight.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+:root {
+    --body-background: #121212;
+    --body-font: 'PPFragmentGlareLight', sans-serif;
+    --border-color: #FFFFFF4D;
+    --body-color: #F1F1F1;
+}
+
+/* NORMALIZE */
+*, button {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    appearance: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color:inherit;
+    font-family: inherit;
+    font-size: inherit;
+}
+/* NORMALIZE */
+
+html {
+    /* Enable smooth scrolling for Lenis */
+    scroll-behavior: auto; /* Lenis will handle smoothness */
+}
+
+body {
+    background: var(--body-background);
+    color: var(--body-color);
+    font-family: var(--body-font);
+    font-size: 2vw;
+}
+.pin-height {
+    height: calc(300vh - 4vw);
+    overflow: hidden;
+}
+.container {
+    white-space: nowrap;
+    width: max-content;
+    height: calc(100vh - 4vw);
+    display: flex;
+}
+.project {
+    position: relative;
+    height: 100%;
+    flex-shrink: 0;
+    min-width: 4vw;
+}
+.project:not(:last-child) {
+    border-right: 1px solid var(--border-color);
+}
+.project:not(.on) {
+    color: var(--border-color);
+    cursor: url("https://cdn.prod.website-files.com/684fd3662bf373c304f927ef/684fd3fa2e5a792140becaff_2b1e000c885a11daa778a26530dd8999_cursor-pointer.svg") 12 0, pointer;
+}
+.project:not(.on) .year,
+.project:not(.on) .media { 
+    display: none;
+}
+.datas {
+    position: absolute;
+    bottom: 0;
+    left: 2vw;
+    line-height: 2.6vw;
+    transform: rotate(-90deg);
+    transform-origin: 0 50%;
+    width: calc(100vh - 6.6vw);
+    display: flex;
+    justify-content: space-between;
+}
+
+
+.outpost .project:hover .datas .label {
+    color: var(--body-color);
+}
+.media {
+    height: calc(100% - 2.6vw);
+    width: auto;
+    margin: 1.3vw 1.3vw 0 4vw;
+    object-fit: cover;
+    border-radius: 0.6vw;
+    aspect-ratio: 1/2;
+}
+
+@media (max-width: 768px) {
+    .pin-height {
+        height: auto;
+    }
+
+    .container {
+        height: auto;
+        white-space: initial;
+        width: 100%;
+        flex-direction: column;
+    }
+
+    .project:not(:first-child) {
+        border-top: 1px solid var(--border-color);
+    }
+    .project {
+        border-right: 0 !important;
+    }
+
+    .project:not(.on) {
+        color: var(--body-color);
+    }
+    .project:not(.on) .year,
+    .project:not(.on) .media { 
+        display: block;
+    }
+
+    .datas {
+        position: relative;
+        transform: none;
+        left: auto;
+        margin: 30px 15px 15px;
+        line-height: 2.6vw;
+        width: auto;
+        display: block;
+    }
+    .media {
+        margin: 15px;
+        width: calc(100% - 30px);
+        height: auto;
+        aspect-ratio: 1.8;
+    }
+}
+
+/* Preview Modal */
+.preview-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--body-background);
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.preview-modal.active {
+    pointer-events: all;
+}
+
+.preview-modal-content {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 4vw);
+    background: var(--body-background);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Preview modal header styles - now applied to .outpost-header when modal is active */
+
+.preview-modal-title {
+    margin: 0;
+}
+
+.preview-close {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    text-decoration: none;
+}
+
+.preview-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: var(--body-background);
+    opacity: 1;
+}
+
+.outpost-header {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 4vw;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 1vw;
+    border-top: 1px solid var(--border-color);
+    background: var(--body-background);
+    z-index: 1001;
+}
+
+.outpost-header p,
+.outpost-header a {
+    text-decoration: none;
+    color: var(--body-color);
+}
+
+
+@media (max-width: 768px) {
+    .outpost-header {
+        top: 0;
+        bottom: auto;
+        border-top: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .preview-modal-content {
+        height: calc(100vh - 4vw);
+    }
+    
+}
+
+
+/* Cursor "default" */
+html,
+body,
+body * {
+  cursor: url("https://cdn.prod.website-files.com/684fd3662bf373c304f927ef/684fd3faf1928131d9db6e0d_936bd88147511144743f09f4477f4c1a_cursor-default.svg") 2 0, auto;
+}
+
+/* Cursor "text" */
+/* body :is([data-cursor="text"], [data-cursor="text"] *),
+body :is(p, h1, h2, h3, h4, h5, h6, input[type="text"], textarea) {
+  cursor: url("https://cdn.prod.website-files.com/684fd3662bf373c304f927ef/684fd3fa187280f5367673ab_a5441e26d72d35676d51172bd3a38038_cursor-text.svg") 9 19, text;
+} */
+
+/* Cursor "pointer" (Hover) */
+body :is([data-cursor="pointer"], [data-cursor="pointer"] *),
+body :is(a, a *, a p, button, button *, select, input[type="submit"], input[type="button"], input[type="radio"], input[type="checkbox"]) {
+  cursor: url("https://cdn.prod.website-files.com/684fd3662bf373c304f927ef/684fd3fa2e5a792140becaff_2b1e000c885a11daa778a26530dd8999_cursor-pointer.svg") 12 0, pointer;
+}
+
+/* Cursor "grab" */
+body :is([data-cursor="grab"], [data-cursor="grab"] *) {
+  cursor: url("https://cdn.prod.website-files.com/684fd3662bf373c304f927ef/684fd3fadd3e56db88677898_e4c3ca1346ce8749e9ebc404b2c38a67_cursor-grab.svg") 12 4, grab;
+}
+
+/* Cursor "grabbing" */
+body :is([data-cursor="grabbing"], [data-cursor="grabbing"] *) {
+  cursor: url("https://cdn.prod.website-files.com/684fd3662bf373c304f927ef/684fd3faadaedb1825819d22_93f8d20982e98baea5d26f613bf60af6_cursor-grabbing.svg") 12 0, grabbing;
+}
+
+footer {
+    position: fixed;
+    top:1.3vw;
+    right:1.3vw;
+    width: 8vw;
+    height: 8vw;
+    border-radius: 50%;
+    background:#444;
+    font-size: 1vw;
+    background:var(--body-background);
+    border:1px solid var(--border-color);
+    color:var(--body-color);
+}
+footer svg {
+    fill:var(--body-color);
+}

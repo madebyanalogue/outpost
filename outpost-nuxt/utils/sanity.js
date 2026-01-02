@@ -1,39 +1,39 @@
 import { createClient } from '@sanity/client'
-import imageUrlBuilder from '@sanity/image-url'
+import { createImageUrlBuilder } from '@sanity/image-url'
 
 export const client = createClient({
   projectId: 'cnvk5vdc',
   dataset: 'production',
   useCdn: true,
   apiVersion: '2024-01-01',
+  // No token needed for public read access
 })
 
-const builder = imageUrlBuilder(client)
+const builder = createImageUrlBuilder(client)
 
 export function urlFor(source) {
   return builder.image(source)
 }
 
 export async function getProjects() {
-  const query = `*[_type == "project"] | order(year desc) {
-    _id,
-    title,
-    year,
-    url,
-    "imageUrl": image.asset->url
-  }`
-  
   try {
-    const projects = await client.fetch(query)
+    // Use server route to avoid CORS issues
+    const response = await fetch('/api/projects', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
     
-    return projects.map(project => ({
-      title: project.title || '',
-      year: project.year || new Date().getFullYear(),
-      href: project.url || '#',
-      image: project.imageUrl || '',
-    }))
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const projects = await response.json()
+    return projects || []
   } catch (error) {
-    console.error('Error fetching projects:', error)
+    console.error('Error fetching projects from server route:', error)
+    // Fallback: return empty array if server route fails
     return []
   }
 }

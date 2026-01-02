@@ -1,272 +1,42 @@
 import { defineNuxtPlugin } from "#app";
-import * as THREE from "three";
+import { nextTick } from "vue";
+import gsap from "gsap";
+import ScrollTrigger from "gsap/ScrollTrigger";
+import Lenis from "lenis";
 import { getProjects } from "~/utils/sanity.js";
-import { vertexShader, fragmentShader } from "~/assets/js/shaders.js";
 
-let projects: Array<{ title: string; year: number; href: string; image: string }> = [];
+let projects: Array<{ title: string; subtitle: string; image: string; href: string; agency?: { title: string; url?: string } | null }> = [];
+let lenis: Lenis | null = null;
 
-const config = {
-  cellSize: 0.75,
-  zoomLevel: 1.25,
-  lerpFactor: 0.075,
-  borderColor: "rgba(255, 255, 255, 0.15)",
-  backgroundColor: "rgba(0, 0, 0, 1)",
-  textColor: "rgba(128, 128, 128, 1)",
-  hoverColor: "rgba(255, 255, 255, 0)",
-};
-
-let scene: THREE.Scene, camera: THREE.OrthographicCamera, renderer: THREE.WebGLRenderer, plane: THREE.Mesh;
-let isDragging = false,
-  isClick = true,
-  clickStartTime = 0;
-let previousMouse = { x: 0, y: 0 };
-let offset = { x: 0, y: 0 },
-  targetOffset = { x: 0, y: 0 };
-let mousePosition = { x: -1, y: -1 };
-let zoomLevel = 1.0,
-  targetZoom = 1.0;
-let textTextures: THREE.CanvasTexture[] = [];
-
-const rgbaToArray = (rgba: string) => {
-  const match = rgba.match(/rgba?\(([^)]+)\)/);
-  if (!match) return [1, 1, 1, 1];
-  return match[1]
-    .split(",")
-    .map((v, i) =>
-      i < 3 ? parseFloat(v.trim()) / 255 : parseFloat(v.trim() || "1")
-    );
-};
-
-const createTextTexture = (title: string, year: number) => {
-  const canvas = document.createElement("canvas");
-  canvas.width = 2048;
-  canvas.height = 256;
-  const ctx = canvas.getContext("2d");
-
-  if (!ctx) return null;
-
-  ctx.clearRect(0, 0, 2048, 256);
-  ctx.font = "80px IBM Plex Mono";
-  ctx.fillStyle = config.textColor;
-  ctx.textBaseline = "middle";
-  ctx.imageSmoothingEnabled = false;
-
-  ctx.textAlign = "left";
-  ctx.fillText(title.toUpperCase(), 30, 128);
-  ctx.textAlign = "right";
-  ctx.fillText(year.toString().toUpperCase(), 2048 - 30, 128);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  Object.assign(texture, {
-    wrapS: THREE.ClampToEdgeWrapping,
-    wrapT: THREE.ClampToEdgeWrapping,
-    minFilter: THREE.NearestFilter,
-    magFilter: THREE.NearestFilter,
-    flipY: false,
-    generateMipmaps: false,
-    format: THREE.RGBAFormat,
-  });
-
-  return texture;
-};
-
-const createTextureAtlas = (textures: THREE.Texture[], isText = false) => {
-  const atlasSize = Math.ceil(Math.sqrt(textures.length));
-  const textureSize = 512;
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = atlasSize * textureSize;
-  const ctx = canvas.getContext("2d");
-
-  if (!ctx) return null;
-
-  if (isText) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-  } else {
-    ctx.fillStyle = "black";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }
-
-  textures.forEach((texture, index) => {
-    const x = (index % atlasSize) * textureSize;
-    const y = Math.floor(index / atlasSize) * textureSize;
-
-    if (isText && (texture as any).source?.data) {
-      ctx.drawImage((texture as any).source.data, x, y, textureSize, textureSize);
-    } else if (!isText && texture.image?.complete) {
-      ctx.drawImage(texture.image, x, y, textureSize, textureSize);
-    }
-  });
-
-  const atlasTexture = new THREE.CanvasTexture(canvas);
-  Object.assign(atlasTexture, {
-    wrapS: THREE.ClampToEdgeWrapping,
-    wrapT: THREE.ClampToEdgeWrapping,
-    minFilter: THREE.LinearFilter,
-    magFilter: THREE.LinearFilter,
-    flipY: false,
-  });
-
-  return atlasTexture;
-};
-
-const loadTextures = () => {
-  const textureLoader = new THREE.TextureLoader();
-  const imageTextures: THREE.Texture[] = [];
-  let loadedCount = 0;
-
-  return new Promise<THREE.Texture[]>((resolve) => {
-    projects.forEach((project) => {
-      const texture = textureLoader.load(project.image, () => {
-        if (++loadedCount === projects.length) resolve(imageTextures);
-      });
-
-      Object.assign(texture, {
-        wrapS: THREE.ClampToEdgeWrapping,
-        wrapT: THREE.ClampToEdgeWrapping,
-        minFilter: THREE.LinearFilter,
-        magFilter: THREE.LinearFilter,
-      });
-
-      imageTextures.push(texture);
-      const textTexture = createTextTexture(project.title, project.year);
-      if (textTexture) textTextures.push(textTexture);
+export default defineNuxtPlugin(async (nuxtApp) => {
+  if (process.client) {
+    // Wait for Vue app to be mounted
+    nuxtApp.hook('app:mounted', async () => {
+      await init();
     });
+  }
+});
+
+async function init() {
+  // Initialize Lenis for smooth scrolling
+  lenis = new Lenis({
+    duration: 1.2, // Animation duration (higher = slower, smoother)
+    easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // Easing function
+    orientation: 'vertical', // Vertical scroll
+    gestureOrientation: 'vertical',
+    smoothWheel: true, // Smooth mouse wheel scrolling
+    wheelMultiplier: 4, // Increase scroll velocity
+    touchMultiplier: 2,
   });
-};
 
-const updateMousePosition = (event: MouseEvent) => {
-  const rect = renderer.domElement.getBoundingClientRect();
-  mousePosition.x = event.clientX - rect.left;
-  mousePosition.y = event.clientY - rect.top;
-  (plane?.material as THREE.ShaderMaterial)?.uniforms.uMousePos.value.set(
-    mousePosition.x,
-    mousePosition.y
-  );
-};
+  // Connect Lenis with GSAP ScrollTrigger
+  lenis.on('scroll', ScrollTrigger.update);
 
-const startDrag = (x: number, y: number) => {
-  isDragging = true;
-  isClick = true;
-  clickStartTime = Date.now();
-  document.body.classList.add("dragging");
-  previousMouse.x = x;
-  previousMouse.y = y;
-  setTimeout(() => isDragging && (targetZoom = config.zoomLevel), 150);
-};
-
-const onPointerDown = (e: MouseEvent) => startDrag(e.clientX, e.clientY);
-const onTouchStart = (e: TouchEvent) => {
-  e.preventDefault();
-  startDrag(e.touches[0].clientX, e.touches[0].clientY);
-};
-
-const handleMove = (currentX: number, currentY: number) => {
-  if (!isDragging || currentX === undefined || currentY === undefined) return;
-
-  const deltaX = currentX - previousMouse.x;
-  const deltaY = currentY - previousMouse.y;
-
-  if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
-    isClick = false;
-    if (targetZoom === 1.0) targetZoom = config.zoomLevel;
-  }
-
-  targetOffset.x -= deltaX * 0.003;
-  targetOffset.y += deltaY * 0.003;
-  previousMouse.x = currentX;
-  previousMouse.y = currentY;
-};
-
-const onPointerMove = (e: MouseEvent) => handleMove(e.clientX, e.clientY);
-const onTouchMove = (e: TouchEvent) => {
-  e.preventDefault();
-  handleMove(e.touches[0].clientX, e.touches[0].clientY);
-};
-
-const onPointerUp = (event: MouseEvent | TouchEvent) => {
-  isDragging = false;
-  document.body.classList.remove("dragging");
-  targetZoom = 1.0;
-
-  if (isClick && Date.now() - clickStartTime < 200) {
-    const endX = (event as MouseEvent).clientX || (event as TouchEvent).changedTouches?.[0]?.clientX;
-    const endY = (event as MouseEvent).clientY || (event as TouchEvent).changedTouches?.[0]?.clientY;
-
-    if (endX !== undefined && endY !== undefined) {
-      const rect = renderer.domElement.getBoundingClientRect();
-      const screenX = ((endX - rect.left) / rect.width) * 2 - 1;
-      const screenY = -(((endY - rect.top) / rect.height) * 2 - 1);
-
-      const radius = Math.sqrt(screenX * screenX + screenY * screenY);
-      const distortion = 1.0 - 0.08 * radius * radius;
-
-      let worldX =
-        screenX * distortion * (rect.width / rect.height) * zoomLevel +
-        offset.x;
-      let worldY = screenY * distortion * zoomLevel + offset.y;
-
-      const cellX = Math.floor(worldX / config.cellSize);
-      const cellY = Math.floor(worldY / config.cellSize);
-      const texIndex = Math.floor((cellX + cellY * 3.0) % projects.length);
-      const actualIndex = texIndex < 0 ? projects.length + texIndex : texIndex;
-
-      if (projects[actualIndex]?.href) {
-        window.location.href = projects[actualIndex].href;
-      }
-    }
-  }
-};
-
-const onWindowResize = () => {
-  const container = document.getElementById("gallery");
-  if (!container) return;
-
-  const { offsetWidth: width, offsetHeight: height } = container;
-  camera.updateProjectionMatrix();
-  renderer.setSize(width, height);
-  renderer.setPixelRatio(window.devicePixelRatio);
-  (plane?.material as THREE.ShaderMaterial)?.uniforms.uResolution.value.set(width, height);
-};
-
-const setupEventListeners = () => {
-  document.addEventListener("mousedown", onPointerDown);
-  document.addEventListener("mousemove", onPointerMove);
-  document.addEventListener("mouseup", onPointerUp);
-  document.addEventListener("mouseleave", onPointerUp);
-
-  const passiveOpts = { passive: false };
-  document.addEventListener("touchstart", onTouchStart, passiveOpts);
-  document.addEventListener("touchmove", onTouchMove, passiveOpts);
-  document.addEventListener("touchend", onPointerUp, passiveOpts);
-
-  window.addEventListener("resize", onWindowResize);
-  document.addEventListener("contextmenu", (e) => e.preventDefault());
-
-  renderer.domElement.addEventListener("mousemove", updateMousePosition);
-  renderer.domElement.addEventListener("mouseleave", () => {
-    mousePosition.x = mousePosition.y = -1;
-    (plane?.material as THREE.ShaderMaterial)?.uniforms.uMousePos.value.set(-1, -1);
+  gsap.ticker.add((time) => {
+    lenis?.raf(time * 1000);
   });
-};
 
-const animate = () => {
-  requestAnimationFrame(animate);
-
-  offset.x += (targetOffset.x - offset.x) * config.lerpFactor;
-  offset.y += (targetOffset.y - offset.y) * config.lerpFactor;
-  zoomLevel += (targetZoom - zoomLevel) * config.lerpFactor;
-
-  if (plane?.material && (plane.material as THREE.ShaderMaterial).uniforms) {
-    (plane.material as THREE.ShaderMaterial).uniforms.uOffset.value.set(offset.x, offset.y);
-    (plane.material as THREE.ShaderMaterial).uniforms.uZoom.value = zoomLevel;
-  }
-
-  renderer.render(scene, camera);
-};
-
-const init = async () => {
-  const container = document.getElementById("gallery");
-  if (!container) return;
+  gsap.ticker.lagSmoothing(0);
 
   // Fetch projects from Sanity
   try {
@@ -280,66 +50,408 @@ const init = async () => {
     return;
   }
 
-  scene = new THREE.Scene();
-  camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
-  camera.position.z = 1;
-
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-  renderer.setSize(container.offsetWidth, container.offsetHeight);
-  renderer.setPixelRatio(window.devicePixelRatio);
-
-  const bgColor = rgbaToArray(config.backgroundColor);
-  renderer.setClearColor(
-    new THREE.Color(bgColor[0], bgColor[1], bgColor[2]),
-    bgColor[3]
-  );
-  container.appendChild(renderer.domElement);
-
-  const imageTextures = await loadTextures();
-  const imageAtlas = createTextureAtlas(imageTextures, false);
-  const textAtlas = createTextureAtlas(textTextures, true);
-
-  if (!imageAtlas || !textAtlas) return;
-
-  const uniforms = {
-    uOffset: { value: new THREE.Vector2(0, 0) },
-    uResolution: {
-      value: new THREE.Vector2(container.offsetWidth, container.offsetHeight),
-    },
-    uBorderColor: {
-      value: new THREE.Vector4(...rgbaToArray(config.borderColor)),
-    },
-    uHoverColor: {
-      value: new THREE.Vector4(...rgbaToArray(config.hoverColor)),
-    },
-    uBackgroundColor: {
-      value: new THREE.Vector4(...rgbaToArray(config.backgroundColor)),
-    },
-    uMousePos: { value: new THREE.Vector2(-1, -1) },
-    uZoom: { value: 1.0 },
-    uCellSize: { value: config.cellSize },
-    uTextureCount: { value: projects.length },
-    uImageAtlas: { value: imageAtlas },
-    uTextAtlas: { value: textAtlas },
+  // Wait for DOM to be ready with retry logic
+  const trySetup = () => {
+    const container = document.querySelector('.outpost .container');
+    if (container) {
+      setupGallery();
+    } else {
+      // Retry after a short delay if container not found
+      requestAnimationFrame(trySetup);
+    }
   };
 
-  const geometry = new THREE.PlaneGeometry(2, 2);
-  const material = new THREE.ShaderMaterial({
-    vertexShader,
-    fragmentShader,
-    uniforms,
+  // Use nextTick to ensure Vue has rendered
+  await nextTick();
+  trySetup();
+}
+
+function setupGallery() {
+  const gallerySection = document.querySelector('.outpost');
+  const container = document.querySelector('.outpost .container');
+  if (!container || !gallerySection) {
+    console.error('Gallery elements not found');
+    return;
+  }
+
+  // Clear any existing content
+  container.innerHTML = '';
+
+  // Create projects from Sanity data
+  projects.forEach((project, index) => {
+    const projectEl = document.createElement('div');
+    projectEl.className = 'project';
+    projectEl.dataset.projectIndex = index.toString();
+    // Add pointer cursor to closed projects (will be removed when project becomes active)
+    projectEl.setAttribute('data-cursor', 'pointer');
+    
+    const datas = document.createElement('div');
+    datas.className = 'datas';
+    
+    const label = document.createElement('p');
+    label.className = 'label';
+    label.textContent = project.title || '';
+    
+    const subtitle = document.createElement('p');
+    subtitle.className = 'year';
+    subtitle.textContent = project.subtitle || '';
+    
+    datas.appendChild(label);
+    datas.appendChild(subtitle);
+    
+    const img = document.createElement('img');
+    img.className = 'media';
+    img.src = project.image;
+    img.alt = project.title;
+    img.setAttribute('data-cursor', 'pointer');
+    
+    projectEl.appendChild(datas);
+    projectEl.appendChild(img);
+    container.appendChild(projectEl);
+    
+    // Hover handler on entire project - turns title white
+    projectEl.addEventListener('mouseenter', () => {
+      projectEl.classList.add('hovered');
+    });
+    
+    projectEl.addEventListener('mouseleave', () => {
+      projectEl.classList.remove('hovered');
+    });
+    
+    // Click handler on image only - opens preview modal
+    img.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (project.href && project.href !== '#') {
+        openPreview(project.href, project.title, project.agency);
+      }
+    });
+    
+    // Click handler on project (but not image) - scrolls to project
+    projectEl.addEventListener('click', (e) => {
+      // Don't handle if clicking on image (image handler will handle it)
+      if ((e.target as HTMLElement).classList.contains('media')) {
+        return;
+      }
+      e.preventDefault();
+      scrollToProject(index, projects.length);
+    });
+  });
+  
+  // Create modal on first setup
+  createModal();
+
+  // Register ScrollTrigger plugin
+  gsap.registerPlugin(ScrollTrigger);
+  
+  // Refresh ScrollTrigger after Lenis is initialized
+  ScrollTrigger.refresh();
+
+  // Only on large devices
+  const mm = gsap.matchMedia();
+  mm.add("(min-width: 769px)", () => {
+    const projectElements = document.querySelectorAll('.outpost .project');
+    if (projectElements.length === 0) return;
+    
+    projectElements[0].classList.add('on');
+    projectElements[0].removeAttribute('data-cursor'); // Remove pointer cursor from first active project
+    const numProjects = projectElements.length;
+    let currentProject = projectElements[0] as HTMLElement;
+
+    const pinHeight = document.querySelector('.outpost .pin-height') as HTMLElement;
+    if (!pinHeight) return;
+
+    // Calculate pin-height based on number of projects
+    // Each project gets roughly 100vh of scroll space, minimum 300vh
+    const calculatedHeight = Math.max(numProjects * 100, 300);
+    pinHeight.style.height = `${calculatedHeight}vh`;
+
+    const dist = (container as HTMLElement).clientWidth - document.body.clientWidth;
+    const footer = document.querySelector('footer') as HTMLElement;
+
+    // Animate container horizontal movement
+    gsap.to(container, {
+      x: -dist,
+      ease: 'none',
+      scrollTrigger: {
+        trigger: pinHeight,
+        pin: container,
+        start: 'top top',
+        end: 'bottom bottom',
+        scrub: true,
+        onUpdate: (self) => {
+          // Determines the closest project based on scroll progress
+          const closestIndex = Math.round(self.progress * (numProjects - 1));
+          const closestProject = projectElements[closestIndex] as HTMLElement;
+          
+          // If the closest project has changed
+          if (closestProject !== currentProject) {
+            currentProject.classList.remove('on');
+            currentProject.setAttribute('data-cursor', 'pointer'); // Add pointer cursor back to closed project
+            closestProject.classList.add('on');
+            closestProject.removeAttribute('data-cursor'); // Remove pointer cursor from active project
+            currentProject = closestProject;
+          }
+        }
+      }
+    });
+
+    // Animate footer rotation based on scroll progress
+    if (footer) {
+      gsap.to(footer, {
+        rotation: 360,
+        ease: 'none',
+        scrollTrigger: {
+          trigger: pinHeight,
+          start: 'top top',
+          end: 'bottom bottom',
+          scrub: true
+        }
+      });
+    }
+  });
+  
+  // Function to scroll to a specific project
+  function scrollToProject(projectIndex: number, totalProjects: number) {
+    if (totalProjects === 0 || !lenis) return;
+    if (totalProjects === 1) {
+      // If only one project, scroll to start
+      const pinHeight = document.querySelector('.outpost .pin-height') as HTMLElement;
+      if (pinHeight) {
+        lenis.scrollTo(pinHeight.offsetTop, {
+          duration: 0.6,
+          easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t))
+        });
+      }
+      return;
+    }
+    
+    const pinHeight = document.querySelector('.outpost .pin-height') as HTMLElement;
+    if (!pinHeight) return;
+
+    // Calculate the scroll progress needed (0 to 1)
+    const targetProgress = projectIndex / totalProjects;
+    
+    // Get the pin-height element's position and height
+    const pinHeightHeight = pinHeight.offsetHeight;
+    const startY = pinHeight.offsetTop;
+    
+    // Calculate target scroll position
+    const targetScrollY = startY + (pinHeightHeight * targetProgress);
+    
+    // Use Lenis for smooth scroll (faster duration for quicker navigation)
+    lenis.scrollTo(targetScrollY, {
+      duration: 0.6,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t))
+    });
+  }
+  
+  // Make scrollToProject available globally
+  (window as any).scrollToProject = scrollToProject;
+}
+
+// Create modal for website preview
+let modal: HTMLElement | null = null;
+let modalContent: HTMLElement | null = null;
+let modalIframe: HTMLIFrameElement | null = null;
+let originalHeader: HTMLElement | null = null;
+let originalHeaderContent: HTMLElement | null = null;
+let originalHeaderLink: HTMLElement | null = null;
+let modalTitle: HTMLElement | null = null;
+let closeButton: HTMLElement | null = null;
+
+function createModal() {
+  if (modal) return; // Modal already exists
+  
+  const gallerySection = document.querySelector('.outpost');
+  if (!gallerySection) return;
+
+  modal = document.createElement('div');
+  modal.className = 'preview-modal';
+  
+  modalContent = document.createElement('div');
+  modalContent.className = 'preview-modal-content';
+  
+  modalIframe = document.createElement('iframe');
+  modalIframe.className = 'preview-iframe';
+  
+  modalContent.appendChild(modalIframe);
+  modal.appendChild(modalContent);
+  gallerySection.appendChild(modal);
+
+  // Get reference to original header
+  originalHeader = document.querySelector('.outpost-header') as HTMLElement;
+  if (originalHeader) {
+    originalHeaderContent = originalHeader.querySelector('p') as HTMLElement;
+    originalHeaderLink = originalHeader.querySelector('a') as HTMLElement;
+  }
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      closePreview();
+    }
   });
 
-  plane = new THREE.Mesh(geometry, material);
-  scene.add(plane);
+  // Close on Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal?.classList.contains('active')) {
+      closePreview();
+    }
+  });
+}
 
-  setupEventListeners();
-  animate();
-};
-
-export default defineNuxtPlugin(() => {
-  if (process.client) {
-    init();
+function openPreview(url: string, title: string, agency?: { title: string; url?: string } | null) {
+  createModal();
+  if (!modalIframe || !modal || !modalContent || !originalHeader) return;
+  
+  // Set iframe to invisible initially
+  gsap.set(modalIframe, { opacity: 0 });
+  
+  // Prepare header content (but keep it invisible)
+  if (originalHeader && originalHeaderContent && originalHeaderLink) {
+    // Clear existing content
+    originalHeaderContent!.innerHTML = '';
+    originalHeaderContent!.className = 'preview-modal-title';
+    
+    // If agency exists and has title, show "Design: [Agency name]" with or without link
+    if (agency && typeof agency === 'object' && agency.title) {
+      const designText = document.createTextNode('Design: ');
+      originalHeaderContent!.appendChild(designText);
+      
+      // If URL exists, create a link; otherwise just show the agency name as text
+      if (agency.url) {
+        const agencyLink = document.createElement('a');
+        agencyLink.href = agency.url;
+        agencyLink.target = '_blank';
+        agencyLink.rel = 'noopener noreferrer';
+        agencyLink.textContent = agency.title;
+        agencyLink.style.textDecoration = 'none';
+        agencyLink.style.color = 'inherit';
+        originalHeaderContent!.appendChild(agencyLink);
+      } else {
+        const agencyText = document.createTextNode(agency.title);
+        originalHeaderContent!.appendChild(agencyText);
+      }
+    } else {
+      originalHeaderContent!.textContent = title || '';
+    }
+    
+    // Remove old link and create/update close button
+    if (originalHeaderLink && originalHeader.contains(originalHeaderLink)) {
+      originalHeader.removeChild(originalHeaderLink);
+    }
+    
+    // Remove existing close button if it exists (to avoid duplicates)
+    if (closeButton && originalHeader.contains(closeButton)) {
+      originalHeader.removeChild(closeButton);
+    }
+    
+    // Create new close button
+    closeButton = document.createElement('button');
+    closeButton.className = 'preview-close';
+    closeButton.textContent = 'Close';
+    closeButton.setAttribute('aria-label', 'Close preview');
+    closeButton.addEventListener('click', closePreview);
+    originalHeader.appendChild(closeButton);
+    
+    // Set new header content and close button to invisible initially
+    gsap.set([originalHeaderContent, closeButton], { opacity: 0 });
   }
-});
+  
+  // Activate modal and fade in background simultaneously with header fade out
+  modal.classList.add('active');
+  
+  // Create timeline to coordinate animations
+  const tl = gsap.timeline();
+  
+  // Step 1: Fade in background and fade out original header content simultaneously
+  tl.to(modal, {
+    opacity: 1,
+    duration: 0.4,
+    ease: 'power2.out'
+  })
+  .to([originalHeaderContent, originalHeaderLink], {
+    opacity: 0,
+    duration: 0.4,
+    ease: 'power2.out'
+  }, 0) // Start at same time as background fade in
+  
+  // Step 2: Once both complete, fade in iframe and project details simultaneously
+  .call(() => {
+    // Load iframe
+    modalIframe!.src = url;
+  })
+  .to([modalIframe, originalHeaderContent, closeButton], {
+    opacity: 1,
+    duration: 0.4,
+    ease: 'power2.out'
+  });
+}
 
+function closePreview() {
+  if (!modalContent || !modal || !modalIframe || !originalHeader) return;
+  
+  // Create timeline to coordinate closing animations (reverse of opening)
+  const tl = gsap.timeline();
+  
+  // Step 1: Fade out iframe and project details simultaneously
+  tl.to(modalIframe, {
+    opacity: 0,
+    duration: 0.4,
+    ease: 'power2.out'
+  })
+  .to([originalHeaderContent, closeButton], {
+    opacity: 0,
+    duration: 0.4,
+    ease: 'power2.out'
+  }, 0) // Start at same time as iframe fade out
+  
+  // Step 2: Once both complete, fade out background and fade in original header simultaneously
+  .call(() => {
+    if (!originalHeader || !originalHeaderContent) return;
+    
+    // Restore original content
+    originalHeaderContent!.textContent = 'Outpost';
+    originalHeaderContent!.className = '';
+    
+    // Remove close button and restore original link
+    if (closeButton && originalHeader.contains(closeButton)) {
+      originalHeader.removeChild(closeButton);
+      closeButton = null;
+    }
+    if (originalHeaderLink) {
+      // Only append if not already in the DOM
+      if (!originalHeader.contains(originalHeaderLink)) {
+        originalHeader.appendChild(originalHeaderLink);
+      }
+      // Set link to invisible initially for fade in
+      gsap.set(originalHeaderLink, { opacity: 0 });
+    }
+    
+    // Set original header content to invisible initially for fade in
+    gsap.set(originalHeaderContent, { opacity: 0 });
+  })
+  .to(modal, {
+    opacity: 0,
+    duration: 0.4,
+    ease: 'power2.out'
+  });
+  
+  // Fade in original header content (and link if it exists)
+  const elementsToFadeIn = [originalHeaderContent];
+  if (originalHeaderLink) {
+    elementsToFadeIn.push(originalHeaderLink);
+  }
+  tl.to(elementsToFadeIn, {
+    opacity: 1,
+    duration: 0.4,
+    ease: 'power2.out'
+  }, '<') // Start at same time as background fade out
+  .call(() => {
+    // Cleanup after animations complete
+    modal?.classList.remove('active');
+    modalIframe!.src = '';
+    // Reset opacity for next open
+    gsap.set(modalIframe, { opacity: 1 });
+  });
+}

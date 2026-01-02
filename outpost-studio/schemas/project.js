@@ -1,3 +1,5 @@
+import { orderRankField } from '@sanity/orderable-document-list'
+
 export default {
   name: 'project',
   title: 'Project',
@@ -25,22 +27,26 @@ export default {
       validation: (Rule) => Rule.required(),
     },
     {
-      name: 'year',
-      title: 'Year',
-      type: 'number',
-      validation: (Rule) => Rule.required().integer().min(2000).max(2100),
+      name: 'subtitle',
+      title: 'Subtitle',
+      type: 'string',
     },
+    {
+      name: 'agency',
+      title: 'Agency',
+      type: 'reference',
+      to: [{ type: 'agency' }],
+    },
+    orderRankField({ type: 'project' }),
   ],
   preview: {
     select: {
       title: 'title',
       media: 'image',
-      year: 'year',
     },
-    prepare({ title, media, year }) {
+    prepare({ title, media }) {
       return {
         title: title,
-        subtitle: year ? year.toString() : '',
         media: media,
       }
     },
